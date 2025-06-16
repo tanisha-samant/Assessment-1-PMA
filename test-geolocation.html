@@ -1,0 +1,12 @@
+<script>
+  console.log('Testing geolocation...');
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => console.log('Success:', pos.coords.latitude, pos.coords.longitude),
+      err => console.error('Error:', err.message, 'Code:', err.code),
+      { timeout: 5000 }
+    );
+  } else {
+    console.error('Geolocation not supported');
+  }
+</script>

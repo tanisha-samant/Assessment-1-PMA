@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Roboto', sans-serif;
+        }
+        .weather-card {
+            transition: transform 0.3s ease-in-out;
+        }
+        .weather-card:hover {
+            transform: translateY(-5px);
+        }
+        .current-weather-card {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+            color: white;
+        }
+        .loading-spinner {
+            display: none;
+        }
+        .about-section {
+            background-color: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .temp-warm { color: #dc3545; }
+        .temp-cool { color: #0d6efd; }
+        .error-message { font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">Weather App by Tanisha Samant</h1>
+        
+        <!-- About Section -->
+        <div class="about-section">
+            <h2>About</h2>
+            <p>The Product Manager Accelerator Program is designed to support PM professionals through every stage of their careers. From students looking for entry-level jobs to Directors looking to take on a leadership role, our program has helped over hundreds of students fulfill their career aspirations.</p>
+            <p>Our Product Manager Accelerator community are ambitious and committed. Through our program they have learnt, honed and developed new PM and leadership skills, giving them a strong foundation for their future endeavors.</p>
+            <p>Learn more at <a href="https://www.linkedin.com/school/pmaccelerator/">Linkedin</a>.</p>
+        </div>
+        
+        <!-- Weather Input Form -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h2 class="card-title">Get Current Weather & 5-Day Forecast</h2>
+                <form id="weatherForm" class="mb-3">
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Location (City, ZIP, or Coordinates):</label>
+                        <input type="text" class="form-control" id="location" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Get Weather</button>
+                    <button type="button" class="btn btn-secondary" onclick="getCurrentLocation()">Use Current Location</button>
+                </form>
+                <div class="loading-spinner text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Weather Results -->
+        <div id="weatherResult" class="row"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function getCurrentLocation() {
+            try {
+                console.log('Attempting to access geolocation...');
+                if (!navigator.geolocation) {
+                    alert('Geolocation is not supported by your browser. Please enter a location manually.');
+                    console.error('Geolocation API not supported');
+                    return;
+                }
+
+                console.log('Requesting geolocation...');
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        const lat = position.coords.latitude.toFixed(4);
+                        const lon = position.coords.longitude.toFixed(4);
+                        console.log('Geolocation success:', { lat, lon });
+                        document.getElementById('location').value = `${lat},${lon}`;
+                        console.log('Submitting form with location:', document.getElementById('location').value);
+                        document.getElementById('weatherForm').submit();
+                    },
+                    error => {
+                        let message;
+                        switch (error.code) {
+                            case error.PERMISSION_DENIED:
+                                message = 'Location access denied. Please enable location permissions in your browser settings and try again, or enter a location manually.';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                message = 'Location information is unavailable. Ensure your device has location services enabled, or enter a location manually.';
+                                break;
+                            case error.TIMEOUT:
+                                message = 'Geolocation request timed out. Please try again or enter a location manually.';
+                                break;
+                            default:
+                                message = 'An unexpected error occurred with geolocation. Please enter a location manually.';
+                        }
+                        alert(message);
+                        console.error('Geolocation error:', error.message, 'Code:', error.code);
+                    },
+                    { timeout: 5000, enableHighAccuracy: true }
+                );
+            } catch (error) {
+                alert('An unexpected error occurred while accessing geolocation. Please enter a location manually.');
+                console.error('Unexpected geolocation error:', error);
+            }
+        }
+
+        document.getElementById('weatherForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const location = document.getElementById('location').value;
+            const weatherResult = document.getElementById('weatherResult');
+            const spinner = document.querySelector('.loading-spinner');
+            
+            // Show loading spinner
+            spinner.style.display = 'block';
+            weatherResult.innerHTML = '';
+
+            try {
+                console.log('Fetching weather for location:', location);
+                const response = await fetch('/weather', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `location=${encodeURIComponent(location)}`
+                });
+                const data = await response.json();
+                
+                // Hide loading spinner
+                spinner.style.display = 'none';
+
+                if (response.ok) {
+                    // Group weather data by day
+                    const dailyWeather = {};
+                    data.weather.time.forEach((time, i) => {
+                        const date = new Date(time);
+                        const dayKey = date.toDateString();
+                        if (!dailyWeather[dayKey]) {
+                            dailyWeather[dayKey] = {
+                                temps: [],
+                                humidities: [],
+                                windSpeeds: [],
+                                weatherCodes: [],
+                                precipProbs: [],
+                                date: date
+                            };
+                        }
+                        dailyWeather[dayKey].temps.push(data.weather.temperature_2m[i]);
+                        dailyWeather[dayKey].humidities.push(data.weather.relative_humidity_2m[i]);
+                        dailyWeather[dayKey].windSpeeds.push(data.weather.wind_speed_10m[i]);
+                        dailyWeather[dayKey].weatherCodes.push(data.weather.weather_code[i]);
+                        dailyWeather[dayKey].precipProbs.push(data.weather.precipitation_probability ? data.weather.precipitation_probability[i] : 0);
+                    });
+
+                    // Generate HTML for weather cards
+                    let html = `<h3 class="mb-4">Weather for ${data.city}</h3>`;
+                    
+                    // Current Weather Card (first day's first hour as approximation)
+                    const firstDay = Object.values(dailyWeather)[0];
+                    const currentTemp = firstDay.temps[0].toFixed(1);
+                    const currentHumidity = firstDay.humidities[0].toFixed(1);
+                    const currentWindSpeed = firstDay.windSpeeds[0].toFixed(1);
+                    const currentPrecipProb = firstDay.precipProbs[0];
+                    const currentWeatherCode = firstDay.weatherCodes[0];
+                    const currentIcon = getWeatherIcon(currentWeatherCode);
+                    const tempClass = currentTemp >= 25 ? 'temp-warm' : 'temp-cool';
+                    
+                    html += `
+                        <div class="col-12 mb-4">
+                            <div class="card current-weather-card shadow-sm">
+                                <div class="card-body">
+                                    <h4>Current Weather</h4>
+                                    <div class="d-flex align-items-center">
+                                        <img src="${currentIcon}" alt="Weather Icon" class="me-3" style="width: 64px;">
+                                        <div>
+                                            <p class="h3 ${tempClass}"><i class="fa fa-thermometer-half me-2"></i>${currentTemp}°C</p>
+                                            <p><i class="fa fa-droplet me-2"></i>Humidity: ${currentHumidity}%</p>
+                                            <p><i class="fa fa-wind me-2"></i>Wind Speed: ${currentWindSpeed} km/h</p>
+                                            <p><i class="fa fa-cloud-rain me-2"></i>Precipitation: ${currentPrecipProb}%</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+
+                    // 5-Day Forecast Cards
+                    Object.values(dailyWeather).slice(0, 5).forEach(day => {
+                        const avgTemp = (day.temps.reduce((a, b) => a + b, 0) / day.temps.length).toFixed(1);
+                        const avgHumidity = (day.humidities.reduce((a, b) => a + b, 0) / day.humidities.length).toFixed(1);
+                        const avgWindSpeed = (day.windSpeeds.reduce((a, b) => a + b, 0) / day.windSpeeds.length).toFixed(1);
+                        const avgPrecipProb = (day.precipProbs.reduce((a, b) => a + b, 0) / day.precipProbs.length).toFixed(1);
+                        const mostFrequentCode = day.weatherCodes.sort((a, b) =>
+                            day.weatherCodes.filter(v => v === a).length - day.weatherCodes.filter(v => v === b).length
+                        ).pop();
+                        const icon = getWeatherIcon(mostFrequentCode);
+                        const tempClass = avgTemp >= 25 ? 'temp-warm' : 'temp-cool';
+
+                        html += `
+                            <div class="col-md-4 mb-4">
+                                <div class="card weather-card shadow-sm">
+                                    <div class="card-body">
+                                        <h5>${day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</h5>
+                                        <img src="${icon}" alt="Weather Icon" class="mb-2" style="width: 48px;">
+                                        <p class="${tempClass}"><i class="fa fa-thermometer-half me-2"></i>${avgTemp}°C</p>
+                                        <p><i class="fa fa-droplet me-2"></i>Humidity: ${avgHumidity}%</p>
+                                        <p><i class="fa fa-wind me-2"></i>Wind Speed: ${avgWindSpeed} km/h</p>
+                                        <p><i class="fa fa-cloud-rain me-2"></i>Precipitation: ${avgPrecipProb}%</p>
+                                    </div>
+                                </div>
+                            </div>`;
+                    });
+                    weatherResult.innerHTML = html;
+                } else {
+                    weatherResult.innerHTML = `<p class="text-danger error-message">${data.error}</p>`;
+                    console.error('Server error:', data.error);
+                }
+            } catch (error) {
+                spinner.style.display = 'none';
+                weatherResult.innerHTML = `<p class="text-danger error-message">Error fetching weather data. Please check your internet connection and try again.</p>`;
+                console.error('Fetch error:', error);
+            }
+        });
+
+        function getWeatherIcon(code) {
+            if (code === 0) return 'http://openweathermap.org/img/wn/01d.png'; // Clear
+            if (code >= 1 && code <= 3) return 'http://openweathermap.org/img/wn/02d.png'; // Partly cloudy
+            if (code >= 51 && code <= 67) return 'http://openweathermap.org/img/wn/10d.png'; // Rain
+            return 'http://openweathermap.org/img/wn/03d.png'; // Default
+        }
+    </script>
+</body>
+</html>
